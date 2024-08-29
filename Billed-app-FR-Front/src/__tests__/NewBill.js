@@ -64,7 +64,7 @@ describe("Given I am connected as an employee", () => {
           jest.clearAllMocks();
         });
 
-        //Test la gestion des erreurs
+        //Test la gestion des erreurs la méthode `update` échoue
         const testErrorHandling = async (errorCode) => {
           // Mock de la méthode update pour simuler une erreur
           const updateMock = jest.fn().mockRejectedValue(new Error(errorCode));
@@ -74,7 +74,7 @@ describe("Given I am connected as an employee", () => {
             update: updateMock,
           }));
 
-          // New instance de NewBill avec le store mocké
+          // New instance de NewBill avec le store mocké et les param
           const newBill = new NewBill({
             document,
             onNavigate: (pathname) => {
@@ -88,11 +88,11 @@ describe("Given I am connected as an employee", () => {
           const form = screen.getByTestId("form-new-bill");
           form.addEventListener("submit", (e) => newBill.handleSubmit(e));
 
-          // Submit form and promise
+          // Submit form and promise en attente
           fireEvent.submit(form);
           await new Promise(process.nextTick);
 
-          // Vérifie que l'erreur simulée est bien levée
+          // Vérifie que la méthode `update` du mock a bien été appelée
           await expect(updateMock).toHaveBeenCalled();
           // Vérifie que l'appel à update a échoué avec l'erreur attendue
           await expect(updateMock).rejects.toThrow(new Error(errorCode));
@@ -101,7 +101,7 @@ describe("Given I am connected as an employee", () => {
         test("Fetch fails with 404 error message", async () => {
           await testErrorHandling("404");
         });
-        // Teste la gestion des erreurs pour un code 404
+        // Teste la gestion des erreurs pour un code 500
         test("Fetch fails with 500 error message", async () => {
           await testErrorHandling("500");
         });
