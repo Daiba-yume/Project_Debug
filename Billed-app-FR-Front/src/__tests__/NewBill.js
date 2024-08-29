@@ -12,24 +12,29 @@ import { ROUTES } from "../constants/routes.js";
 describe("Given I am connected as an employee", () => {
   describe("When I am on NewBill Page", () => {
     test("Then the bill should be created successfully", () => {
+      // Génère et insère le html(NewBill) dans le DOM
       const html = NewBillUI();
       document.body.innerHTML = html;
+
+      // Simule la navigation en modifiant le contenu du DOM
       const onNavigate = (pathname) => {
         document.body.innerHTML = ROUTES({ pathname });
       };
 
+      // Config localStorage pour un utilisateur connecté
       Object.defineProperty(window, "localStorage", {
         value: localStorageMock,
       });
       window.localStorage.setItem("user", JSON.stringify({ type: "Employee" }));
 
+      // Création de l'instance NewBill
       const newBill = new NewBill({
         document,
         onNavigate,
         store: mockStore,
         localStorage: localStorageMock,
       });
-
+      // Remplissage des champs du form
       screen.getByTestId("expense-type").value = "Transports";
       screen.getByTestId("expense-name").value = "Vol Paris-Espagne";
       screen.getByTestId("datepicker").value = "2023-08-28";
@@ -38,10 +43,12 @@ describe("Given I am connected as an employee", () => {
       screen.getByTestId("pct").value = "20";
       screen.getByTestId("commentary").value = "Voyage d'affaires";
 
+      // Soumission du form
       const form = screen.getByTestId("form-new-bill");
       form.addEventListener("submit", newBill.handleSubmit);
       fireEvent.submit(form);
 
+      // Vérifie que la facture a été créée après la soumission
       expect(screen.getByText("Mes notes de frais")).toBeTruthy();
     });
   });
