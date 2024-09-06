@@ -31,7 +31,7 @@ export default class NewBill {
 
     if (!validExtensions.includes(fileExtension)) {
       alert("Veuillez sélectionner un fichier au format jpg, jpeg ou png.");
-      fileInput.value = "";
+      this.document.querySelector(`input[data-testid="file"]`).value = "";
       return;
     }
 
