@@ -5,37 +5,48 @@
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import NewBillUI from "../views/NewBillUI.js";
 import NewBill from "../containers/NewBill.js";
-import { ROUTES, ROUTES_PATH } from "../constants/routes.js";
+import { ROUTES } from "../constants/routes.js";
 import { localStorageMock } from "../__mocks__/localStorage.js";
 import mockStore from "../__mocks__/store";
 import router from "../app/Router.js";
 
 jest.mock("../app/Store", () => mockStore);
 
+// Création de l'instance de NewBill avec des paramètres communs
+const createNewBillInstance = () => {
+  document.body.innerHTML = NewBillUI();
+  return new NewBill({
+    document,
+    onNavigate: (pathname) => {
+      document.body.innerHTML = ROUTES({ pathname });
+    },
+    store: mockStore,
+    localStorage: window.localStorage,
+  });
+};
+
+// Configuration initiale avant chaque test
+beforeEach(() => {
+  Object.defineProperty(window, "localStorage", {
+    value: localStorageMock,
+  });
+  window.localStorage.setItem("user", JSON.stringify({ type: "Employee" }));
+  const root = document.createElement("div");
+  root.setAttribute("id", "root");
+  document.body.append(root);
+  router();
+});
+
+// Clean après chaque test
+afterEach(() => {
+  document.body.innerHTML = "";
+  jest.clearAllMocks();
+});
+
 describe("Given I am connected as an employee", () => {
   describe("When I am on NewBill Page", () => {
     test("Then the bill should be created successfully", async () => {
-      // Génère et insère le HTML de la page NewBill dans le DOM
-      document.body.innerHTML = NewBillUI();
-
-      // Simule la navigation en modifiant le contenu du DOM
-      const onNavigate = (pathname) => {
-        document.body.innerHTML = ROUTES({ pathname });
-      };
-
-      // Mock du localStorage pour simuler un utilisateur connecté
-      Object.defineProperty(window, "localStorage", {
-        value: localStorageMock,
-      });
-      window.localStorage.setItem("user", JSON.stringify({ type: "Employee" }));
-
-      // Création de l'instance NewBill
-      const newBill = new NewBill({
-        document,
-        onNavigate,
-        store: mockStore,
-        localStorage: window.localStorage,
-      });
+      const newBill = createNewBillInstance();
 
       // Remplissage des champs du formulaire
       screen.getByTestId("expense-type").value = "Transports";
@@ -55,68 +66,105 @@ describe("Given I am connected as an employee", () => {
       expect(screen.getByText("Mes notes de frais")).toBeTruthy();
     });
 
-    describe("When I submit and an error occurs", () => {
-      beforeEach(() => {
-        document.body.innerHTML = NewBillUI();
+    test("Then I upload a file with a valid format", () => {
+      // Initialise le formulaire NewBill et crée une instance de NewBill
+      const newBill = createNewBillInstance();
+      // Simule la méthode handleChangeFile pour gérer l'upload de fichier
+      const handleChangeFile = jest.fn(newBill.handleChangeFile);
+      // Sélectionne le champ de fichier (upload) dans le DOM
+      const file = screen.getByTestId("file");
+
+      // Ajout de l'event "change" pour détecter un fichier téléchargé
+      file.addEventListener("change", handleChangeFile);
+
+      // Simule le téléchargement d'un fichier image PNG valide
+      fireEvent.change(file, {
+        target: {
+          files: [new File(["file.png"], "file.png", { type: "image/png" })],
+        },
       });
 
-      //Clean le DOM et réinitialise les mocks
-      afterEach(() => {
-        afterEach(() => {
-          document.body.innerHTML = "";
-          jest.clearAllMocks();
-        });
+      // On Vérifie que handleChangeFile a bien été appelé
+      //et que le fichier est bien chargé
+      expect(handleChangeFile).toHaveBeenCalled();
+      expect(file.files[0].name).toBe("file.png");
+      expect(newBill.formData).not.toBe(null);
+    });
+    test("test adding file with the wrong format", async () => {
+      const newBill = createNewBillInstance();
+      // Simule la fonction handleChangeFile pour vérifier son appel
+      const handleChangeFile = jest.fn(newBill.handleChangeFile);
+      // Sélectionne le champ de fichier dans le DOM
+      const inputFile = screen.getByTestId("file");
+      // Simule une alerte globale pour les tests
+      global.alert = jest.fn();
 
-        //Test la gestion des erreurs la méthode `update` échoue
-        const testErrorHandling = async (errorCode) => {
-          // Mock de la méthode update pour simuler une erreur
-          const updateMock = jest.fn().mockRejectedValue(new Error(errorCode));
-          // Remplace la méthode bills du store pour utiliser le mock
-          mockStore.bills = jest.fn(() => ({
-            create: jest.fn().mockResolvedValue({}),
-            update: updateMock,
-          }));
+      // Ajoute d'un event pour les changements de fichier
+      inputFile.addEventListener("change", handleChangeFile);
+      // Simule le changement de fichier avc un fichier wrong format
+      fireEvent.change(inputFile, {
+        target: {
+          files: [
+            new File(["../assets/images/test.txt"], "test.txt", {
+              type: "application/txt",
+            }),
+          ],
+        },
+      });
+      // Vérifie que handleChangeFile a été appelé
+      expect(handleChangeFile).toBeCalled();
+      // le texte est affiché
+      expect(screen.getByText("Envoyer une note de frais")).toBeTruthy();
+      // Vérifie que le champ de fichier est toujours présent dans le DOM
+      expect(screen.getAllByTestId("file")).toBeTruthy();
+    });
 
-          // New instance de NewBill avec le store mocké et les param
-          const newBill = new NewBill({
-            document,
-            onNavigate: (pathname) => {
-              document.body.innerHTML = ROUTES({ pathname });
-            },
-            store: mockStore,
-            localStorage: window.localStorage,
-          });
+    describe("When I submit and an error occurs", () => {
+      //Test la gestion des erreurs la méthode `update` échoue
+      const testErrorHandling = async (errorCode) => {
+        // Mock de la méthode update pour simuler une erreur
+        const updateMock = jest.fn().mockRejectedValue(new Error(errorCode));
+        // Remplace la méthode bills du store pour utiliser le mock
+        mockStore.bills = jest.fn(() => ({
+          create: jest.fn().mockResolvedValue({}),
+          update: updateMock,
+        }));
 
-          // Select form depuis le DOM
-          const form = screen.getByTestId("form-new-bill");
-          form.addEventListener("submit", (e) => newBill.handleSubmit(e));
+        const newBill = createNewBillInstance();
 
-          // Submit form and promise en attente
-          fireEvent.submit(form);
-          await new Promise(process.nextTick);
+        // Select form depuis le DOM
+        const form = screen.getByTestId("form-new-bill");
+        form.addEventListener("submit", (e) => newBill.handleSubmit(e));
 
-          // Vérifie que la méthode `update` du mock a bien été appelée
-          await expect(updateMock).toHaveBeenCalled();
-          // Vérifie que l'appel à update a échoué avec l'erreur attendue
-          await expect(updateMock).rejects.toThrow(new Error(errorCode));
-        };
-        // Teste la gestion des erreurs pour un code 404
-        test("Fetch fails with 404 error message", async () => {
-          await testErrorHandling("404");
-        });
-        // Teste la gestion des erreurs pour un code 500
-        test("Fetch fails with 500 error message", async () => {
-          await testErrorHandling("500");
-        });
+        // Submit form and promise en attente
+        fireEvent.submit(form);
+        await new Promise(process.nextTick);
+
+        // Vérifie que la méthode `update` du mock a bien été appelée
+        await expect(updateMock).toHaveBeenCalled();
+        // Vérifie que l'appel à update a échoué avec l'erreur attendue
+        await expect(updateMock).rejects.toThrow(new Error(errorCode));
+      };
+      // Teste la gestion des erreurs pour un code 404
+      test("Fetch fails with 404 error message", async () => {
+        await testErrorHandling("404");
+      });
+      // Teste la gestion des erreurs pour un code 500
+      test("Fetch fails with 500 error message", async () => {
+        await testErrorHandling("500");
       });
     });
   });
-  // test d'intégration POST
+
+  // test d'intégration POST (ajout d'une note de frais via l'API)
   describe("When I am on NewBill Page, I fill the form and submit", () => {
     test("Then the bill is added to API POST", async () => {
+      // Charger la page NewBill
       const html = NewBillUI();
       document.body.innerHTML = html;
+      const newBill = createNewBillInstance();
 
+      // Création des données de la note de frais à tester
       const bill = {
         email: "employee@test.tld",
         type: "Transports",
@@ -131,6 +179,7 @@ describe("Given I am connected as an employee", () => {
         status: "pending",
       };
 
+      //Remplissage des différents champs
       const typeField = screen.getByTestId("expense-type");
       fireEvent.change(typeField, { target: { value: bill.type } });
       expect(typeField.value).toBe(bill.type);
@@ -155,38 +204,26 @@ describe("Given I am connected as an employee", () => {
       });
       expect(commentaryField.value).toBe(bill.commentary);
 
+      // Configurer la soumission du formulaire
       const newBillForm = screen.getByTestId("form-new-bill");
-      const onNavigate = (pathname) => {
-        document.body.innerHTML = ROUTES({ pathname });
-      };
-      Object.defineProperty(window, "localStorage", {
-        value: localStorageMock,
-      });
-      const newBill = new NewBill({
-        document,
-        onNavigate,
-        store: mockStore,
-        localStorage: window.localStorage,
-      });
+      const handleSubmit = jest.fn(newBill.handleSubmit.bind(newBill));
+      newBillForm.addEventListener("submit", handleSubmit);
 
-      const handleChangeFile = jest.fn(newBill.handleChangeFile);
-      newBillForm.addEventListener("change", handleChangeFile);
-      //const fileField = screen.getByTestId("file");
-      // fireEvent.change(fileField, {
-      // target: {
-      // files: [
-      //   new File([bill.fileName], bill.fileUrl, { type: "image/png" }),
-      //  ],
-      // },
-      //  });
-      // expect(fileField.files[0].name).toBe(bill.fileUrl);
-      // expect(fileField.files[0].type).toBe("image/png");
-      // expect(handleChangeFile).toHaveBeenCalled();
+      // Ajout d'un fichier à la note de frais
+      const fileField = screen.getByTestId("file");
+      fireEvent.change(fileField, {
+        target: {
+          files: [
+            new File([bill.fileName], bill.fileUrl, { type: "image/png" }),
+          ],
+        },
+      });
+      expect(fileField.files[0].name).toBe(bill.fileUrl);
+      expect(fileField.files[0].type).toBe("image/png");
 
-      // const handleSubmit = jest.fn(newBill.handleSubmit);
-      // newBillForm.addEventListener("submit", handleSubmit);
-      // fireEvent.submit(newBillForm);
-      // expect(handleSubmit).toHaveBeenCalled();
+      // SSoumission du form et vérifie l'appel de la fonction
+      fireEvent.submit(newBillForm);
+      expect(handleSubmit).toHaveBeenCalled();
     });
   });
 });
