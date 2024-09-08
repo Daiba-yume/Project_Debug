@@ -90,7 +90,7 @@ describe("Given I am connected as an employee", () => {
       expect(file.files[0].name).toBe("file.png");
       expect(newBill.formData).not.toBe(null);
     });
-    test("test adding file with the wrong format", async () => {
+    test("Then I upload file with the wrong format", async () => {
       const newBill = createNewBillInstance();
       // Simule la fonction handleChangeFile pour vérifier son appel
       const handleChangeFile = jest.fn(newBill.handleChangeFile);
