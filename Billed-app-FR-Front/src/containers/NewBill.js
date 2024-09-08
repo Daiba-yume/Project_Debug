@@ -25,11 +25,9 @@ export default class NewBill {
     const fileName = filePath[filePath.length - 1];
 
     // add extensions correctes (jpg, jpeg, png)
-    const fileExtension = fileName.split(".").pop().toLowerCase();
+    const validExtensions = ["image/jpg", "image/jpeg", "image/png"]; //types d'images autorisés
 
-    const validExtensions = ["jpg", "jpeg", "png"];
-
-    if (!validExtensions.includes(fileExtension)) {
+    if (!validExtensions.includes(file.type)) {
       alert("Veuillez sélectionner un fichier au format jpg, jpeg ou png.");
       this.document.querySelector(`input[data-testid="file"]`).value = "";
       return;

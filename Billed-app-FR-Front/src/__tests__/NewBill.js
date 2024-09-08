@@ -162,7 +162,6 @@ describe("Given I am connected as an employee", () => {
       // Charger la page NewBill
       const html = NewBillUI();
       document.body.innerHTML = html;
-      const newBill = createNewBillInstance();
 
       // Création des données de la note de frais à tester
       const bill = {
@@ -206,9 +205,20 @@ describe("Given I am connected as an employee", () => {
 
       // Configurer la soumission du formulaire
       const newBillForm = screen.getByTestId("form-new-bill");
-      const handleSubmit = jest.fn(newBill.handleSubmit.bind(newBill));
-      newBillForm.addEventListener("submit", handleSubmit);
-
+      const onNavigate = (pathname) => {
+        document.body.innerHTML = ROUTES({ pathname });
+      };
+      Object.defineProperty(window, "localStorage", {
+        value: localStorageMock,
+      });
+      const newBill = new NewBill({
+        document,
+        onNavigate,
+        store: mockStore,
+        localStorage: window.localStorage,
+      });
+      const handleChangeFile = jest.fn(newBill.handleChangeFile);
+      newBillForm.addEventListener("change", handleChangeFile);
       // Ajout d'un fichier à la note de frais
       const fileField = screen.getByTestId("file");
       fireEvent.change(fileField, {
@@ -220,8 +230,11 @@ describe("Given I am connected as an employee", () => {
       });
       expect(fileField.files[0].name).toBe(bill.fileUrl);
       expect(fileField.files[0].type).toBe("image/png");
+      expect(handleChangeFile).toHaveBeenCalled();
 
-      // SSoumission du form et vérifie l'appel de la fonction
+      // Soumission du form et vérifie l'appel de la fonction
+      const handleSubmit = jest.fn(newBill.handleSubmit);
+      newBillForm.addEventListener("submit", handleSubmit);
       fireEvent.submit(newBillForm);
       expect(handleSubmit).toHaveBeenCalled();
     });
